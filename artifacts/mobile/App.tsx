@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,8 @@ const C = {
   line: '#E6ECF1',
 };
 
+const TASKS_STORAGE_KEY = 'im-ready-tasks';
+
 type Tab = 'Home' | 'My Day' | 'Goals' | 'Profile';
 
 export default function App() {
@@ -30,6 +33,51 @@ export default function App() {
     { id: '2', title: 'Take a little time for yourself', done: false },
     { id: '3', title: 'Review your goals', done: false },
   ]);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadTasks = async () => {
+      try {
+        const savedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+        if (savedTasks !== null) {
+          const parsedTasks = JSON.parse(savedTasks);
+          if (Array.isArray(parsedTasks) && isActive) {
+            setTasks(parsedTasks);
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to load saved tasks.', error);
+      } finally {
+        if (isActive) {
+          setTasksLoaded(true);
+        }
+      }
+    };
+
+    void loadTasks();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tasksLoaded) {
+      return;
+    }
+
+    const saveTasks = async () => {
+      try {
+        await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+      } catch (error) {
+        console.warn('Unable to save tasks.', error);
+      }
+    };
+
+    void saveTasks();
+  }, [tasks, tasksLoaded]);
 
   const completed = useMemo(() => tasks.filter((task) => task.done).length, [tasks]);
 
