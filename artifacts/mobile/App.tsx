@@ -217,7 +217,7 @@ export default function App() {
       </ScrollView>
       <View style={styles.tabBar}>
         {(['Home', 'My Day', 'Goals', 'Profile'] as Tab[]).map((name) => (
-          <TouchableOpacity key={name} style={styles.tabButton} onPress={() => { setOpportunitiesOpen(false); setTab(name); }} activeOpacity={0.7}>
+          <TouchableOpacity key={name} style={styles.tabButton} onPress={() => { setOpportunitiesOpen(false); setScreen('home'); setTab(name); }} activeOpacity={0.7}>
             <Text style={[styles.tabIcon, tab === name && styles.tabActive]}>{({ Home: '⌂', 'My Day': '☑', Goals: '◎', Profile: '○' } as Record<Tab, string>)[name]}</Text>
             <Text style={[styles.tabLabel, tab === name && styles.tabLabelActive]}>{name}</Text>
           </TouchableOpacity>
