@@ -77,6 +77,15 @@ const C = {
 };
 
 const TASKS_STORAGE_KEY = 'im-ready-tasks';
+const COUNCIL_SELECTION_STORAGE_KEY = 'im-ready-council-selection';
+
+const isCouncilSelection = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every(
+    (name: unknown) =>
+      typeof name === 'string' &&
+      FOUNDING_MEMBERS.some((member) => member.name === name),
+  );
 
 type Tab = 'Home' | 'My Day' | 'Goals' | 'Profile';
 type Screen = 'home' | 'council';
@@ -91,6 +100,8 @@ export default function App() {
     { id: '3', title: 'Review your goals', done: false },
   ]);
   const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [selectedMemberNames, setSelectedMemberNames] = useState<string[]>([]);
+  const [councilSelectionLoaded, setCouncilSelectionLoaded] = useState(false);
 
   useEffect(() => {
     let isActive = true;
@@ -140,6 +151,72 @@ export default function App() {
 
     void saveTasks();
   }, [tasks, tasksLoaded]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadCouncilSelection = async () => {
+      try {
+        const savedSelection = await AsyncStorage.getItem(
+          COUNCIL_SELECTION_STORAGE_KEY,
+        );
+        if (!isActive) {
+          return;
+        }
+        if (savedSelection !== null) {
+          const parsedSelection: unknown = JSON.parse(savedSelection);
+          if (!isCouncilSelection(parsedSelection)) {
+            return;
+          }
+          setSelectedMemberNames(parsedSelection);
+        }
+        setCouncilSelectionLoaded(true);
+      } catch (error) {
+        console.warn('Unable to load Council selection.', error);
+      }
+    };
+
+    void loadCouncilSelection();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!councilSelectionLoaded) {
+      return;
+    }
+
+    const saveCouncilSelection = async () => {
+      try {
+        await AsyncStorage.setItem(
+          COUNCIL_SELECTION_STORAGE_KEY,
+          JSON.stringify(selectedMemberNames),
+        );
+      } catch (error) {
+        console.warn('Unable to save Council selection.', error);
+      }
+    };
+
+    void saveCouncilSelection();
+  }, [selectedMemberNames, councilSelectionLoaded]);
+
+  const toggleCouncilMember = (memberName: string) => {
+    setSelectedMemberNames((current) =>
+      current.includes(memberName)
+        ? current.filter((name) => name !== memberName)
+        : [...current, memberName],
+    );
+  };
+
+  const selectAllCouncilMembers = () => {
+    setSelectedMemberNames(FOUNDING_MEMBERS.map((member) => member.name));
+  };
+
+  const clearAllCouncilMembers = () => {
+    setSelectedMemberNames([]);
+  };
 
   const completed = useMemo(() => tasks.filter((task) => task.done).length, [tasks]);
 
@@ -276,6 +353,32 @@ export default function App() {
         ))}
       </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Meeting picker</Text></View>
+      <View style={styles.progressRow}>
+        <TouchableOpacity onPress={selectAllCouncilMembers} activeOpacity={0.7}>
+          <Text style={styles.seeAll}>Select All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={clearAllCouncilMembers} activeOpacity={0.7}>
+          <Text style={styles.seeAll}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.card}>
+        {FOUNDING_MEMBERS.map((member) => {
+          const isSelected = selectedMemberNames.includes(member.name);
+          return (
+            <TouchableOpacity
+              key={member.name}
+              style={[styles.taskRow, styles.progressRow]}
+              onPress={() => toggleCouncilMember(member.name)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.check, isSelected && styles.checkDone]}>
+                {isSelected ? <Text style={styles.checkMark}>✓</Text> : null}
+              </View>
+              <Text style={styles.taskText}>{member.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Queen's controls</Text></View>
     </View>
   );
