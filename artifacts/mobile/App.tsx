@@ -41,18 +41,24 @@ export default function App() {
     const loadTasks = async () => {
       try {
         const savedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+        if (!isActive) {
+          return;
+        }
         if (savedTasks !== null) {
           const parsedTasks = JSON.parse(savedTasks);
-          if (Array.isArray(parsedTasks) && isActive) {
-            setTasks(parsedTasks);
+          if (Array.isArray(parsedTasks)) {
+            const validTasks = parsedTasks.filter(                 (
+                task: unknown): task is { id: string; title: string; done: boolean } =>                   
+                  typeof task === 'object' &&                   task !== null &&                   typeof (task as { id: unknown }).id === 'string' &&                   
+                  typeof (task as { title: unknown }).title === 'string' &&                   
+                  typeof (task as { done: unknown }).done === 'boolean',               );
+                             if (validTasks.length > 0) {                 
+                              setTasks(validTasks);               }
           }
+      
         }
-      } catch (error) {
+      setTasksLoaded(true); } catch (error) {
         console.warn('Unable to load saved tasks.', error);
-      } finally {
-        if (isActive) {
-          setTasksLoaded(true);
-        }
       }
     };
 
