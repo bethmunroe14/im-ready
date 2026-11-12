@@ -6,9 +6,11 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 type FoundingMemberKind = 'provider-backed' | 'persona-preset';
 
@@ -102,6 +104,17 @@ export default function App() {
   const [tasksLoaded, setTasksLoaded] = useState(false);
   const [selectedMemberNames, setSelectedMemberNames] = useState<string[]>([]);
   const [councilSelectionLoaded, setCouncilSelectionLoaded] = useState(false);
+  const [meetingPaused, setMeetingPaused] = useState<boolean>(false);
+  const [meetingEnded, setMeetingEnded] = useState<boolean>(false);
+  const [mutedMembers, setMutedMembers] = useState<string[]>([]);
+  const [dismissedMembers, setDismissedMembers] = useState<string[]>([]);
+  const [redirectInstruction, setRedirectInstruction] = useState<string>('');
+  const [redirectInput, setRedirectInput] = useState<string>('');
+  const [queenMessage, setQueenMessage] = useState<string>('');
+  const [confirmingDismiss, setConfirmingDismiss] = useState<string | null>(null);
+  const [confirmingEnd, setConfirmingEnd] = useState<boolean>(false);
+  const [actionBusy, setActionBusy] = useState<boolean>(false);
+  const [interruptedSpeaker, setInterruptedSpeaker] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -216,6 +229,166 @@ export default function App() {
 
   const clearAllCouncilMembers = () => {
     setSelectedMemberNames([]);
+  };
+
+  const activeCouncilMembers = selectedMemberNames
+    .map((name) => FOUNDING_MEMBERS.find((member) => member.name === name))
+    .filter(
+      (member): member is FoundingMember =>
+        member !== undefined && !dismissedMembers.includes(member.name),
+    );
+
+  const beginQueenAction = () => {
+    if (actionBusy) {
+      return false;
+    }
+    setActionBusy(true);
+    setTimeout(() => setActionBusy(false), 300);
+    return true;
+  };
+
+  const interruptCouncil = () => {
+    if (actionBusy || meetingPaused || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setInterruptedSpeaker(activeCouncilMembers[0]?.name ?? null);
+    setQueenMessage('Speaking turn interrupted.');
+  };
+
+  const toggleMemberMute = (memberName: string) => {
+    if (actionBusy || meetingPaused || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    const isMuted = mutedMembers.includes(memberName);
+    setMutedMembers((current) =>
+      isMuted
+        ? current.filter((name) => name !== memberName)
+        : [...current, memberName],
+    );
+    setQueenMessage(`${memberName} ${isMuted ? 'unmuted' : 'muted'}.`);
+  };
+
+  const pauseCouncil = () => {
+    if (actionBusy || meetingPaused || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setMeetingPaused(true);
+    setQueenMessage('Council paused.');
+  };
+
+  const resumeCouncil = () => {
+    if (actionBusy || !meetingPaused || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setMeetingPaused(false);
+    setQueenMessage('Council resumed.');
+  };
+
+  const setCouncilRedirect = () => {
+    if (actionBusy || meetingPaused || meetingEnded || !redirectInput.trim()) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setRedirectInstruction(redirectInput.trim());
+    setRedirectInput('');
+    setQueenMessage('New instruction set.');
+  };
+
+  const requestMemberDismiss = (memberName: string) => {
+    if (actionBusy || meetingPaused || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setConfirmingDismiss(memberName);
+    setQueenMessage(`Confirm dismissing ${memberName}?`);
+  };
+
+  const confirmMemberDismiss = () => {
+    if (actionBusy || meetingPaused || meetingEnded || !confirmingDismiss) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    const memberName = confirmingDismiss;
+    setDismissedMembers((current) =>
+      current.includes(memberName) ? current : [...current, memberName],
+    );
+    setConfirmingDismiss(null);
+    setQueenMessage(`${memberName} dismissed from this meeting. Profile kept.`);
+  };
+
+  const cancelMemberDismiss = () => {
+    if (!beginQueenAction()) {
+      return;
+    }
+    setConfirmingDismiss(null);
+    setQueenMessage('Dismissal cancelled.');
+  };
+
+  const requestEndMeeting = () => {
+    if (actionBusy || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setConfirmingEnd(true);
+    setQueenMessage('Confirm ending this meeting?');
+  };
+
+  const confirmEndMeeting = () => {
+    if (actionBusy || meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setMeetingEnded(true);
+    setMeetingPaused(false);
+    setConfirmingEnd(false);
+    setQueenMessage('Meeting ended. History and saved selections kept.');
+  };
+
+  const cancelEndMeeting = () => {
+    if (!beginQueenAction()) {
+      return;
+    }
+    setConfirmingEnd(false);
+    setQueenMessage('Ending meeting cancelled.');
+  };
+
+  const startNewMeeting = () => {
+    if (actionBusy || !meetingEnded) {
+      return;
+    }
+    if (!beginQueenAction()) {
+      return;
+    }
+    setMeetingEnded(false);
+    setDismissedMembers([]);
+    setMutedMembers([]);
+    setInterruptedSpeaker(null);
+    setRedirectInstruction('');
+    setConfirmingDismiss(null);
+    setConfirmingEnd(false);
+    setQueenMessage('New meeting started.');
   };
 
   const completed = useMemo(() => tasks.filter((task) => task.done).length, [tasks]);
@@ -380,6 +553,200 @@ export default function App() {
         })}
       </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Queen's controls</Text></View>
+      <View style={styles.queenPanel}>
+        <Text style={styles.queenStatus}>
+          Meeting: {meetingEnded ? 'Ended' : meetingPaused ? 'Paused' : 'Active'}
+        </Text>
+        <Text style={styles.queenStatus}>
+          Current speaker: {meetingEnded ? 'None' : interruptedSpeaker ? 'Interrupted' : activeCouncilMembers[0]?.name ?? 'None'}
+        </Text>
+        <Text style={styles.queenNote}>
+          Prototype controls — no live voice or AI connection yet. Providers are Planned. Mute, Interrupt and Redirect update this prototype only.
+        </Text>
+        <View style={styles.queenControlRow}>
+          <TouchableOpacity
+            style={[styles.queenButton, (activeCouncilMembers.length === 0 || meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+            onPress={interruptCouncil}
+            disabled={activeCouncilMembers.length === 0 || meetingPaused || meetingEnded || actionBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Interrupt selected speaker (prototype only)"
+            testID="interruptCouncil"
+          >
+            <Text style={styles.queenButtonText}>Interrupt (prototype)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.queenButton, (meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+            onPress={pauseCouncil}
+            disabled={meetingPaused || meetingEnded || actionBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Pause Council meeting"
+            testID="pauseCouncil"
+          >
+            <Text style={styles.queenButtonText}>Pause Council</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.queenButton, (!meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+            onPress={resumeCouncil}
+            disabled={!meetingPaused || meetingEnded || actionBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Resume Council meeting"
+            testID="resumeCouncil"
+          >
+            <Text style={styles.queenButtonText}>Resume Council</Text>
+          </TouchableOpacity>
+        </View>
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0}>
+          <View style={styles.queenRedirectRow}>
+            <TextInput
+              style={styles.queenInput}
+              value={redirectInput}
+              onChangeText={setRedirectInput}
+              onSubmitEditing={setCouncilRedirect}
+              placeholder="New topic or instruction for the Council…"
+              placeholderTextColor={C.muted}
+              accessibilityRole="text"
+              accessibilityLabel="Redirect instruction"
+              testID="queenRedirectInput"
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={[styles.queenButton, styles.queenRedirectButton, (!redirectInput.trim() || meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+              onPress={setCouncilRedirect}
+              disabled={!redirectInput.trim() || meetingPaused || meetingEnded || actionBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Set Council instruction (prototype only)"
+              testID="setCouncilInstruction"
+            >
+              <Text style={styles.queenButtonText}>Set instruction</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+        {redirectInstruction ? (
+          <Text style={styles.queenInstruction}>
+            Current instruction: {redirectInstruction}
+          </Text>
+        ) : null}
+        <Text style={styles.queenSubheading}>Selected members</Text>
+        {activeCouncilMembers.length === 0 ? (
+          <Text style={styles.queenEmpty}>
+            Select members in Meeting picker to show their controls here.
+          </Text>
+        ) : (
+          activeCouncilMembers.map((member) => {
+            const isMuted = mutedMembers.includes(member.name);
+            return (
+              <View key={member.name} style={styles.queenMemberRow}>
+                <View style={styles.queenMemberInfo}>
+                  <Text style={styles.queenMemberName}>{member.name}</Text>
+                  <Text style={styles.queenMemberState}>
+                    {isMuted ? 'Muted in this prototype' : 'Unmuted'}
+                  </Text>
+                </View>
+                <View style={styles.queenMemberActions}>
+                  <TouchableOpacity
+                    style={[styles.queenButton, (meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+                    onPress={() => toggleMemberMute(member.name)}
+                    disabled={meetingPaused || meetingEnded || actionBusy}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isMuted ? 'Unmute' : 'Mute'} ${member.name} (prototype only)`}
+                    testID={`toggleMute-${member.name}`}
+                  >
+                    <Text style={styles.queenButtonText}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                  </TouchableOpacity>
+                  {confirmingDismiss === member.name ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.queenButton, (meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+                        onPress={confirmMemberDismiss}
+                        disabled={meetingPaused || meetingEnded || actionBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Confirm dismissing ${member.name} from this meeting`}
+                        testID={`confirmDismiss-${member.name}`}
+                      >
+                        <Text style={styles.queenButtonText}>Confirm</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.queenButton, actionBusy && styles.queenButtonDisabled]}
+                        onPress={cancelMemberDismiss}
+                        disabled={actionBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Cancel dismissing ${member.name}`}
+                        testID={`cancelDismiss-${member.name}`}
+                      >
+                        <Text style={styles.queenButtonSecondaryText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.queenButton, styles.queenButtonSecondary, (meetingPaused || meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+                      onPress={() => requestMemberDismiss(member.name)}
+                      disabled={meetingPaused || meetingEnded || actionBusy}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Dismiss ${member.name} from this meeting`}
+                      testID={`dismissMember-${member.name}`}
+                    >
+                      <Text style={styles.queenButtonSecondaryText}>Dismiss</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          })
+        )}
+        <View style={styles.queenControlRow}>
+          <TouchableOpacity
+            style={[styles.queenButton, styles.queenEndButton, (meetingEnded || actionBusy) && styles.queenButtonDisabled]}
+            onPress={requestEndMeeting}
+            disabled={meetingEnded || actionBusy}
+            accessibilityRole="button"
+            accessibilityLabel="End Council meeting"
+            testID="endCouncilMeeting"
+          >
+            <Text style={styles.queenButtonText}>End Meeting</Text>
+          </TouchableOpacity>
+          {confirmingEnd ? (
+            <>
+              <TouchableOpacity
+                style={[styles.queenButton, styles.queenEndButton, actionBusy && styles.queenButtonDisabled]}
+                onPress={confirmEndMeeting}
+                disabled={actionBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Confirm ending Council meeting"
+                testID="confirmEndCouncilMeeting"
+              >
+                <Text style={styles.queenButtonText}>Confirm End Meeting</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.queenButton, styles.queenButtonSecondary, actionBusy && styles.queenButtonDisabled]}
+                onPress={cancelEndMeeting}
+                disabled={actionBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel ending Council meeting"
+                testID="cancelEndCouncilMeeting"
+              >
+                <Text style={styles.queenButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+          {meetingEnded ? (
+            <TouchableOpacity
+              style={[styles.queenButton, actionBusy && styles.queenButtonDisabled]}
+              onPress={startNewMeeting}
+              disabled={actionBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Start a new Council meeting"
+              testID="startNewCouncilMeeting"
+            >
+              <Text style={styles.queenButtonText}>Start a new meeting</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {queenMessage ? (
+          <Text style={styles.queenMessage} accessibilityLiveRegion="polite">
+            {queenMessage}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -480,4 +847,26 @@ const styles = StyleSheet.create({
   tabActive: { color: C.teal },
   tabLabel: { color: C.muted, fontSize: 9, marginTop: 3, fontWeight: '600' },
   tabLabelActive: { color: C.teal, fontWeight: '900' },
+  queenPanel: { backgroundColor: C.white, borderRadius: 19, padding: 15, borderWidth: 1, borderColor: C.line, marginBottom: 12 },
+  queenNote: { color: C.navy, backgroundColor: C.pale, borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  queenStatus: { color: C.navy, fontSize: 14, fontWeight: '800', marginTop: 5 },
+  queenControlRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 8 },
+  queenButton: { minHeight: 48, backgroundColor: C.teal, borderRadius: 12, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 8 },
+  queenButtonDisabled: { opacity: 0.45 },
+  queenButtonText: { color: C.white, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  queenButtonSecondary: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line },
+  queenButtonSecondaryText: { color: C.navy, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  queenEndButton: { backgroundColor: C.navy },
+  queenRedirectRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 8 },
+  queenRedirectButton: { flexGrow: 1 },
+  queenInput: { minHeight: 48, flexGrow: 1, flexBasis: 180, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 12, color: C.navy, backgroundColor: C.white, marginTop: 8 },
+  queenInstruction: { color: C.navy, backgroundColor: C.pale, borderRadius: 12, padding: 12, fontSize: 13, lineHeight: 19, marginTop: 10 },
+  queenSubheading: { color: C.navy, fontSize: 13, fontWeight: '800', marginTop: 18, marginBottom: 4 },
+  queenEmpty: { color: C.muted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  queenMemberRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 8 },
+  queenMemberInfo: { flexGrow: 1, flexBasis: 90, paddingVertical: 4 },
+  queenMemberName: { color: C.navy, fontSize: 13, fontWeight: '800' },
+  queenMemberState: { color: C.muted, fontSize: 11, marginTop: 3 },
+  queenMemberActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  queenMessage: { color: C.navy, backgroundColor: C.pale, borderRadius: 12, padding: 12, fontSize: 13, lineHeight: 18, marginTop: 14 },
 });
