@@ -24,9 +24,11 @@ const C = {
 const TASKS_STORAGE_KEY = 'im-ready-tasks';
 
 type Tab = 'Home' | 'My Day' | 'Goals' | 'Profile';
+type Screen = 'home' | 'council';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('Home');
+  const [screen, setScreen] = useState<Screen>('home');
   const [opportunitiesOpen, setOpportunitiesOpen] = useState(false);
   const [tasks, setTasks] = useState([
     { id: '1', title: 'Check today’s priorities', done: false },
@@ -112,7 +114,7 @@ export default function App() {
       </TouchableOpacity>
       <Text style={styles.explainer}>I’m Ready helps you find work and income opportunities that fit you, and keeps your plans, tasks and goals in one place.</Text>
 
-      <TouchableOpacity style={styles.aiCard} onPress={() => setTab('Profile')} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.aiCard} onPress={() => setScreen('council')} activeOpacity={0.85}>
         <View style={styles.aiIcon}><Text style={styles.aiIconText}>✦</Text></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle}>Talk to your AI team</Text>
@@ -183,6 +185,21 @@ export default function App() {
     );
   };
 
+  const renderCouncil = () => (
+    <View>
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>Your AI team</Text>
+        <TouchableOpacity onPress={() => setScreen('home')} activeOpacity={0.7}>
+          <Text style={styles.seeAll}>Back</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Founding members</Text></View>
+      <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Provider directory</Text></View>
+      <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Meeting picker</Text></View>
+      <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Queen's controls</Text></View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
@@ -195,7 +212,7 @@ export default function App() {
         <View style={styles.statusDot} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'Home' ? (opportunitiesOpen ? renderOpportunities() : renderHome()) : renderOther()}
+        {screen === 'council' ? renderCouncil() : tab === 'Home' ? (opportunitiesOpen ? renderOpportunities() : renderHome()) : renderOther()}
         <Text style={styles.footer}>A little more organized. A little more you.</Text>
       </ScrollView>
       <View style={styles.tabBar}>
