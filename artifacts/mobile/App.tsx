@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
-type FoundingMemberKind = 'provider-backed' | 'persona-preset';
+type FoundingMemberKind = 'planned-provider' | 'persona-preset';
 
 type FoundingMember = {
   name: string;
@@ -22,20 +22,22 @@ type FoundingMember = {
   kind: FoundingMemberKind;
 };
 
+type Task = { id: string; title: string; done: boolean };
+
 const FOUNDING_MEMBERS: FoundingMember[] = [
   {
     name: 'Nova',
     role: 'Lead assistant',
     personality: 'Warm, clear and encouraging',
     department: 'Planning',
-    kind: 'provider-backed',
+    kind: 'planned-provider',
   },
   {
     name: 'Muse',
     role: 'Thoughtful assistant',
     personality: 'Calm, careful and helpful',
     department: 'Reflection',
-    kind: 'provider-backed',
+    kind: 'planned-provider',
   },
   {
     name: 'Atlas',
@@ -80,6 +82,11 @@ const C = {
 
 const TASKS_STORAGE_KEY = 'im-ready-tasks';
 const COUNCIL_SELECTION_STORAGE_KEY = 'im-ready-council-selection';
+const STARTER_TASKS: Task[] = [
+  { id: '1', title: 'Check today’s priorities', done: false },
+  { id: '2', title: 'Take a little time for yourself', done: false },
+  { id: '3', title: 'Review your goals', done: false },
+];
 
 const isCouncilSelection = (value: unknown): value is string[] =>
   Array.isArray(value) &&
@@ -96,14 +103,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('Home');
   const [screen, setScreen] = useState<Screen>('home');
   const [opportunitiesOpen, setOpportunitiesOpen] = useState(false);
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Check today’s priorities', done: false },
-    { id: '2', title: 'Take a little time for yourself', done: false },
-    { id: '3', title: 'Review your goals', done: false },
-  ]);
+  const [tasks, setTasks] = useState(STARTER_TASKS);
   const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [tasksLoadFailed, setTasksLoadFailed] = useState(false);
   const [selectedMemberNames, setSelectedMemberNames] = useState<string[]>([]);
   const [councilSelectionLoaded, setCouncilSelectionLoaded] = useState(false);
+  const [councilSelectionLoadFailed, setCouncilSelectionLoadFailed] = useState(false);
   const [meetingPaused, setMeetingPaused] = useState<boolean>(false);
   const [meetingEnded, setMeetingEnded] = useState<boolean>(false);
   const [mutedMembers, setMutedMembers] = useState<string[]>([]);
@@ -126,19 +131,38 @@ export default function App() {
           return;
         }
         if (savedTasks !== null) {
-          const parsedTasks = JSON.parse(savedTasks);
-          if (Array.isArray(parsedTasks)) {
-            const validTasks = parsedTasks.filter(                 (
-                task: unknown): task is { id: string; title: string; done: boolean } =>                   
-                  typeof task === 'object' &&                   task !== null &&                   typeof (task as { id: unknown }).id === 'string' &&                   
-                  typeof (task as { title: unknown }).title === 'string' &&                   
-                  typeof (task as { done: unknown }).done === 'boolean',               );
-            setTasks(validTasks);
+          let parsedTasks: unknown;
+          try {
+            parsedTasks = JSON.parse(savedTasks);
+          } catch (error) {
+            console.warn('Unable to parse saved tasks; using starter tasks.', error);
+            setTasks(STARTER_TASKS);
+            setTasksLoaded(true);
+            return;
           }
-      
+          if (Array.isArray(parsedTasks)) {
+            const validTasks = parsedTasks.filter(
+              (task: unknown): task is Task =>
+                typeof task === 'object' &&
+                task !== null &&
+                typeof (task as { id: unknown }).id === 'string' &&
+                typeof (task as { title: unknown }).title === 'string' &&
+                typeof (task as { done: unknown }).done === 'boolean',
+            );
+            setTasks(validTasks);
+          } else {
+            console.warn('Saved tasks were malformed; using starter tasks.');
+            setTasks(STARTER_TASKS);
+          }
         }
-      setTasksLoaded(true); } catch (error) {
+        setTasksLoaded(true);
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
         console.warn('Unable to load saved tasks.', error);
+        setTasksLoadFailed(true);
+        setTasksLoaded(true);
       }
     };
 
@@ -150,7 +174,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!tasksLoaded) {
+    if (!tasksLoaded || tasksLoadFailed) {
       return;
     }
 
@@ -163,7 +187,7 @@ export default function App() {
     };
 
     void saveTasks();
-  }, [tasks, tasksLoaded]);
+  }, [tasks, tasksLoaded, tasksLoadFailed]);
 
   useEffect(() => {
     let isActive = true;
@@ -177,8 +201,18 @@ export default function App() {
           return;
         }
         if (savedSelection !== null) {
-          const parsedSelection: unknown = JSON.parse(savedSelection);
+          let parsedSelection: unknown;
+          try {
+            parsedSelection = JSON.parse(savedSelection);
+          } catch (error) {
+            console.warn('Unable to parse saved Council selection.', error);
+            setSelectedMemberNames([]);
+            setCouncilSelectionLoaded(true);
+            return;
+          }
           if (!isCouncilSelection(parsedSelection)) {
+            setSelectedMemberNames([]);
+            setCouncilSelectionLoaded(true);
             return;
           }
           setSelectedMemberNames(parsedSelection);
@@ -186,6 +220,11 @@ export default function App() {
         setCouncilSelectionLoaded(true);
       } catch (error) {
         console.warn('Unable to load Council selection.', error);
+        if (!isActive) {
+          return;
+        }
+        setCouncilSelectionLoadFailed(true);
+        setCouncilSelectionLoaded(true);
       }
     };
 
@@ -197,7 +236,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!councilSelectionLoaded) {
+    if (!councilSelectionLoaded || councilSelectionLoadFailed) {
       return;
     }
 
@@ -213,9 +252,10 @@ export default function App() {
     };
 
     void saveCouncilSelection();
-  }, [selectedMemberNames, councilSelectionLoaded]);
+  }, [selectedMemberNames, councilSelectionLoaded, councilSelectionLoadFailed]);
 
   const toggleCouncilMember = (memberName: string) => {
+    setCouncilSelectionLoadFailed(false);
     setSelectedMemberNames((current) =>
       current.includes(memberName)
         ? current.filter((name) => name !== memberName)
@@ -224,10 +264,12 @@ export default function App() {
   };
 
   const selectAllCouncilMembers = () => {
+    setCouncilSelectionLoadFailed(false);
     setSelectedMemberNames(FOUNDING_MEMBERS.map((member) => member.name));
   };
 
   const clearAllCouncilMembers = () => {
+    setCouncilSelectionLoadFailed(false);
     setSelectedMemberNames([]);
   };
 
@@ -394,6 +436,7 @@ export default function App() {
   const completed = useMemo(() => tasks.filter((task) => task.done).length, [tasks]);
 
   const toggleTask = (id: string) => {
+    setTasksLoadFailed(false);
     setTasks((current) =>
       current.map((task) => (task.id === id ? { ...task, done: !task.done } : task)),
     );
@@ -449,7 +492,7 @@ export default function App() {
       <View style={styles.grid}>
         <QuickCard icon="☀️" title="My Day" subtitle="Tasks & routines" onPress={() => setTab('My Day')} />
         <QuickCard icon="🎯" title="Goals" subtitle="Make progress" onPress={() => setTab('Goals')} />
-        <QuickCard icon="✨" title="AI Council" subtitle="Work together" onPress={() => setTab('Profile')} />
+        <QuickCard icon="✨" title="AI Council" subtitle="Work together" onPress={() => setScreen('council')} />
         <QuickCard icon="💼" title="Income Finder" subtitle="Explore work" onPress={() => setTab('Goals')} />
       </View>
     </>
@@ -498,15 +541,15 @@ export default function App() {
         </TouchableOpacity>
       </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Founding members</Text></View>
-      <Text style={styles.explainer}>Provider-backed assistant identities are associated with providers; persona presets are character-inspired identities, not backed by a provider.</Text>
+      <Text style={styles.explainer}>Planned provider association — assistant identities are planned to be associated with a provider; persona presets are character-inspired identities, not backed by a provider.</Text>
       <View style={styles.card}>
         {FOUNDING_MEMBERS.map((member) => (
           <View key={member.name} style={styles.taskRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>{member.name}</Text>
               <Text style={styles.progressText}>
-                {member.kind === 'provider-backed'
-                  ? 'Provider-backed assistant'
+                {member.kind === 'planned-provider'
+                  ? 'Planned provider association'
                   : 'Persona preset — character-inspired, not backed by a provider'}
               </Text>
               <Text style={styles.cardSub}>Role: {member.role}</Text>
