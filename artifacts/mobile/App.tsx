@@ -10,6 +10,61 @@ import {
   View,
 } from 'react-native';
 
+type FoundingMemberKind = 'provider-backed' | 'persona-preset';
+
+type FoundingMember = {
+  name: string;
+  role: string;
+  personality: string;
+  department: string;
+  kind: FoundingMemberKind;
+};
+
+const FOUNDING_MEMBERS: FoundingMember[] = [
+  {
+    name: 'Nova',
+    role: 'Lead assistant',
+    personality: 'Warm, clear and encouraging',
+    department: 'Planning',
+    kind: 'provider-backed',
+  },
+  {
+    name: 'Muse',
+    role: 'Thoughtful assistant',
+    personality: 'Calm, careful and helpful',
+    department: 'Reflection',
+    kind: 'provider-backed',
+  },
+  {
+    name: 'Atlas',
+    role: 'Steady guide',
+    personality: 'Grounded, practical and reassuring',
+    department: 'Routines',
+    kind: 'persona-preset',
+  },
+  {
+    name: 'Lyra',
+    role: 'Creative companion',
+    personality: 'Bright, curious and imaginative',
+    department: 'Creativity',
+    kind: 'persona-preset',
+  },
+];
+
+const PROVIDERS: { name: string; status: 'Planned' }[] = [
+  { name: 'ChatGPT', status: 'Planned' },
+  { name: 'Muse', status: 'Planned' },
+  { name: 'Meta AI', status: 'Planned' },
+  { name: 'Grok', status: 'Planned' },
+  { name: 'Gemini', status: 'Planned' },
+  { name: 'Claude', status: 'Planned' },
+  { name: 'Copilot', status: 'Planned' },
+  { name: 'Perplexity', status: 'Planned' },
+  { name: 'DeepSeek', status: 'Planned' },
+  { name: 'Mistral', status: 'Planned' },
+  { name: 'Llama', status: 'Planned' },
+];
+
 const C = {
   teal: '#0ABAB5',
   navy: '#101B35',
@@ -54,8 +109,7 @@ export default function App() {
                   typeof task === 'object' &&                   task !== null &&                   typeof (task as { id: unknown }).id === 'string' &&                   
                   typeof (task as { title: unknown }).title === 'string' &&                   
                   typeof (task as { done: unknown }).done === 'boolean',               );
-                             if (validTasks.length > 0) {                 
-                              setTasks(validTasks);               }
+            setTasks(validTasks);
           }
       
         }
@@ -132,7 +186,7 @@ export default function App() {
           <Text style={styles.cardTitle}>A few small steps</Text>
           <Text style={styles.progressText}>{completed}/{tasks.length} done</Text>
         </View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${(completed / tasks.length) * 100}%` }]} /></View>
+        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${tasks.length === 0 ? 0 : (completed / tasks.length) * 100}%` }]} /></View>
         {tasks.slice(0, 2).map((task) => (
           <TouchableOpacity key={task.id} style={styles.taskRow} onPress={() => toggleTask(task.id)} activeOpacity={0.7}>
             <View style={[styles.check, task.done && styles.checkDone]}>{task.done ? <Text style={styles.checkMark}>✓</Text> : null}</View>
@@ -194,7 +248,33 @@ export default function App() {
         </TouchableOpacity>
       </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Founding members</Text></View>
+      <Text style={styles.explainer}>Provider-backed assistant identities are associated with providers; persona presets are character-inspired identities, not backed by a provider.</Text>
+      <View style={styles.card}>
+        {FOUNDING_MEMBERS.map((member) => (
+          <View key={member.name} style={styles.taskRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{member.name}</Text>
+              <Text style={styles.progressText}>
+                {member.kind === 'provider-backed'
+                  ? 'Provider-backed assistant'
+                  : 'Persona preset — character-inspired, not backed by a provider'}
+              </Text>
+              <Text style={styles.cardSub}>Role: {member.role}</Text>
+              <Text style={styles.cardSub}>Personality: {member.personality}</Text>
+              <Text style={styles.cardSub}>Department: {member.department}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Provider directory</Text></View>
+      <View style={styles.card}>
+        {PROVIDERS.map((provider) => (
+          <View key={provider.name} style={[styles.taskRow, styles.progressRow]}>
+            <Text style={styles.cardTitle}>{provider.name}</Text>
+            <Text style={styles.progressText}>{provider.status}</Text>
+          </View>
+        ))}
+      </View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Meeting picker</Text></View>
       <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Queen's controls</Text></View>
     </View>
